@@ -1,0 +1,107 @@
+[tasks.install-deps]
+description = "Install all development dependencies"
+run = """
+cargo install wasm-pack
+cargo install cargo-watch
+cargo install cargo-audit
+"""
+
+[tasks.setup]
+description = "Initial project setup"
+deps = ["install-deps"]
+run = "cargo fetch"
+
+[tasks.build]
+description = "Build for native platform"
+run = "cargo build --release"
+
+[tasks.build-web]
+description = "Build WebAssembly package"
+run = "wasm-pack build --target web"
+
+[tasks.build-linux]
+description = "Build for Linux"
+run = "cargo build --release --target x86_64-unknown-linux-gnu"
+
+[tasks.build-windows]
+description = "Build for Windows"
+run = "cargo build --release --target x86_64-pc-windows-gnu"
+
+[tasks.build-macos]
+description = "Build for macOS"
+run = "cargo build --release --target x86_64-apple-darwin"
+
+[tasks.test]
+description = "Run all tests"
+run = "cargo test"
+
+[tasks.test-watch]
+description = "Run tests in watch mode"
+run = "cargo watch -x test"
+
+[tasks.serve]
+description = "Serve web example"
+run = """
+cd examples/web
+python3 -m http.server 8080
+"""
+
+[tasks.dev]
+description = "Start development environment"
+run = """
+mise run build-web
+mise run serve
+"""
+
+[tasks.check]
+description = "Run various checks"
+run = """
+cargo fmt -- --check
+cargo clippy
+cargo audit
+"""
+
+[tasks.format]
+description = "Format code"
+run = "cargo fmt"
+
+[tasks.clean]
+description = "Clean build artifacts"
+run = """
+cargo clean
+rm -rf pkg
+"""
+
+[tasks.doc]
+description = "Generate documentation"
+run = "cargo doc --no-deps --open"
+
+[tasks.benchmark]
+description = "Run benchmarks"
+run = "cargo bench"
+
+[tasks.update-deps]
+description = "Update dependencies"
+run = """
+cargo update
+cargo outdated
+"""
+
+[tasks.release]
+description = "Prepare for release"
+deps = ["check", "test", "build", "build-web"]
+run = """
+echo "Ready for release!"
+echo "Don't forget to:"
+echo "1. Update version in Cargo.toml"
+echo "2. Update CHANGELOG.md"
+echo "3. Create git tag"
+"""
+
+[tasks.ci]
+description = "Run CI checks"
+deps = ["check", "test"]
+run = """
+mise run build
+mise run build-web
+"""

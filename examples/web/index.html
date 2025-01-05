@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>WASM Flock Demo</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+            background: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas" width="800" height="600"></canvas>
+    <script type="module">
+        import init, { Flock } from './pkg/wasm_flock.js';
+
+        async function run() {
+            await init();
+
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            const flock = new Flock(canvas.width, canvas.height, 50);
+
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                const positions = flock.get_boids();
+                
+                ctx.fillStyle = '#333';
+                for (let i = 0; i < positions.length; i += 2) {
+                    const x = positions[i];
+                    const y = positions[i + 1];
+                    
+                    ctx.beginPath();
+                    ctx.arc(x, y, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                flock.update();
+                requestAnimationFrame(draw);
+            }
+
+            draw();
+        }
+
+        run();
+    </script>
+</body>
+</html>
