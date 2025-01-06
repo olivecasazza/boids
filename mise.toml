@@ -15,12 +15,21 @@ run = "cargo fetch"
 description = "Build for native platform"
 run = "cargo build --release"
 
+
 [tasks.build-web]
-description = "Build WebAssembly package"
+description = "Build WebAssembly (vertex buffer based) package"
 run = """
 rm -rf ./pkg ./examples/web/pkg
 wasm-pack build --target web
-cp -R ./pkg ./examples/web
+cp -R ./pkg ./examples/web/
+"""
+
+[tasks.build-web-canvas]
+description = "Build WebAssembly (canvas based) package"
+run = """
+rm -rf ./pkg ./examples/web-canvas/pkg
+wasm-pack build --target web
+cp -R ./pkg ./examples/web-canvas/
 """
 
 [tasks.build-linux]
@@ -45,9 +54,9 @@ run = "cargo watch -x test"
 
 [tasks.serve]
 description = "Serve web example"
-depends = ["build-web"]
+depends = ["build-web-canvas"]
 run = """
-cd examples/web
+cd examples/web-canvas
 python3 -m http.server 8080
 """
 

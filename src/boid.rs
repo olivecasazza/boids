@@ -45,49 +45,89 @@ impl Boid {
             return Vec2::ZERO;
         }
 
-        // Pre-filter boids of the same species
-        let same_species: Vec<_> = nearby_boids.iter()
-            .filter(|(_, index)| all_boids[*index].species_id == self.species_id)
-            .collect();
+        // Split nearby boids into same species and other species
+        let (same_species, other_species): (Vec<_>, Vec<_>) = nearby_boids.iter()
+            .partition(|(_, index)| all_boids[*index].species_id == self.species_id);
 
-        if same_species.is_empty() {
-            return Vec2::ZERO;
-        }
+        let mut total_force = Vec2::ZERO;
 
-        let count = same_species.len() as f32;
+        // Process same species interactions
+        if !same_species.is_empty() {
+            let count = same_species.len() as f32;
 
-        // Alignment
-        let avg_velocity: Vec2 = same_species.iter()
-            .map(|&(_, index)| all_boids[*index].velocity)
-            .sum::<Vec2>() / count;
-        
-        let alignment = (avg_velocity.normalize_or_zero() * species.max_speed - self.velocity)
-            .clamp_length_max(species.max_force) * species.alignment_force;
+            // Alignment - same species
+            let avg_velocity: Vec2 = same_species.iter()
+                .map(|&(_, index)| all_boids[index].velocity)
+                .sum::<Vec2>() / count;
+            
+            let alignment = (avg_velocity.normalize_or_zero() * species.max_speed - self.velocity)
+                .clamp_length_max(species.max_force) * species.alignment_force;
 
-        // Cohesion
-        let center_of_mass: Vec2 = same_species.iter()
-            .map(|&(pos, _)| pos)
-            .sum::<Vec2>() / count;
-        
-        let cohesion = ((center_of_mass - self.position).normalize_or_zero() * species.max_speed - self.velocity)
-            .clamp_length_max(species.max_force) * species.cohesion_force;
+            // Cohesion - same species
+            let center_of_mass: Vec2 = same_species.iter()
+                .map(|&(pos, _)| pos)
+                .sum::<Vec2>() / count;
+            
+            let cohesion = ((center_of_mass - self.position).normalize_or_zero() * species.max_speed - self.velocity)
+                .clamp_length_max(species.max_force) * species.cohesion_force;
 
-        // Separation
-        let mut separation = Vec2::ZERO;
-        for &(pos, _) in &same_species {
-            let offset = self.position - *pos;
-            let dist_sq = offset.length_squared();
-            if dist_sq > 0.0 {
-                separation += offset / dist_sq;
+            // Separation - same species
+            let mut separation = Vec2::ZERO;
+            for &(pos, _) in &same_species {
+                let offset = self.position - pos;
+                let dist_sq = offset.length_squared();
+                if dist_sq > 0.0 {
+                    separation += offset / dist_sq;
+                }
             }
-        }
-        
-        if !separation.is_nan() {
-            separation = (separation.normalize_or_zero() * species.max_speed - self.velocity)
-                .clamp_length_max(species.max_force) * species.separation_force;
+            
+            if !separation.is_nan() {
+                separation = (separation.normalize_or_zero() * species.max_speed - self.velocity)
+                    .clamp_length_max(species.max_force) * species.separation_force;
+            }
+
+            total_force += alignment + cohesion + separation;
         }
 
-        alignment + cohesion + separation
+        // Process other species interactions
+        if !other_species.is_empty() {
+            let count = other_species.len() as f32;
+
+            // Alignment - other species
+            let avg_velocity: Vec2 = other_species.iter()
+                .map(|&(_, index)| all_boids[index].velocity)
+                .sum::<Vec2>() / count;
+            
+            let alignment = (avg_velocity.normalize_or_zero() * species.max_speed - self.velocity)
+                .clamp_length_max(species.max_force) * species.alignment_force * species.other_species_alignment_multiplier;
+
+            // Cohesion - other species
+            let center_of_mass: Vec2 = other_species.iter()
+                .map(|&(pos, _)| pos)
+                .sum::<Vec2>() / count;
+            
+            let cohesion = ((center_of_mass - self.position).normalize_or_zero() * species.max_speed - self.velocity)
+                .clamp_length_max(species.max_force) * species.cohesion_force * species.other_species_cohesion_multiplier;
+
+            // Separation - other species
+            let mut separation = Vec2::ZERO;
+            for &(pos, _) in &other_species {
+                let offset = self.position - pos;
+                let dist_sq = offset.length_squared();
+                if dist_sq > 0.0 {
+                    separation += offset / dist_sq;
+                }
+            }
+            
+            if !separation.is_nan() {
+                separation = (separation.normalize_or_zero() * species.max_speed - self.velocity)
+                    .clamp_length_max(species.max_force) * species.separation_force * species.other_species_separation_multiplier;
+            }
+
+            total_force += alignment + cohesion + separation;
+        }
+
+        total_force
     }
 
     // Keep these methods for compatibility but make them use the combined calculation

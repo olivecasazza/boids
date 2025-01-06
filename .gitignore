@@ -1,2 +1,4 @@
 /target
-examples/web/target
+examples/web-canvas/target
+pkg
+examples/web-canvas/pkg

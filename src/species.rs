@@ -24,6 +24,11 @@ pub struct Species {
     
     // Spawn properties
     pub(crate) spawn_rate_multiplier: f32,
+
+    // Inter-species interaction multipliers
+    pub(crate) other_species_alignment_multiplier: f32,
+    pub(crate) other_species_cohesion_multiplier: f32,
+    pub(crate) other_species_separation_multiplier: f32,
 }
 
 #[wasm_bindgen]
@@ -41,6 +46,9 @@ impl Species {
         size: f32,
         color: u32,
         spawn_rate_multiplier: f32,
+        other_species_alignment_multiplier: f32,
+        other_species_cohesion_multiplier: f32,
+        other_species_separation_multiplier: f32,
     ) -> Self {
         Self {
             alignment_radius,
@@ -54,6 +62,9 @@ impl Species {
             size,
             color,
             spawn_rate_multiplier,
+            other_species_alignment_multiplier,
+            other_species_cohesion_multiplier,
+            other_species_separation_multiplier,
         }
     }
 
@@ -70,6 +81,9 @@ impl Species {
             size: 5.0,
             color: 0xFF0000FF, // Red color
             spawn_rate_multiplier: 1.0,
+            other_species_alignment_multiplier: 0.5,
+            other_species_cohesion_multiplier: 0.5,
+            other_species_separation_multiplier: 1.5,
         }
     }
 
@@ -106,6 +120,11 @@ impl Species {
             
             // Spawn rate between 0.5 and 2.0
             spawn_rate_multiplier: rng.gen_range(0.5..2.0),
+            
+            // Random inter-species interaction multipliers
+            other_species_alignment_multiplier: rng.gen_range(0.2..1.0),
+            other_species_cohesion_multiplier: rng.gen_range(0.2..1.0),
+            other_species_separation_multiplier: rng.gen_range(1.0..2.0),
         }
     }
 }

@@ -28,7 +28,17 @@ impl Flock {
             height,
         };
 
-        let default_species_id = flock.add_species(Species::default());
+        // Create a default species with neutral inter-species behavior
+        let default_species = Species::new(
+            50.0, 50.0, 25.0,   // radii
+            1.0, 1.0, 1.0,      // forces
+            4.0, 0.1,           // speed/force
+            5.0,                // size
+            0xFF0000FF,         // color (red)
+            1.0,                // spawn multiplier
+            0.5, 0.5, 1.5       // other species interaction multipliers
+        );
+        let default_species_id = flock.add_species(default_species);
         flock.add_boids(count, default_species_id);
 
         flock
@@ -150,8 +160,8 @@ impl Flock {
 
     #[wasm_bindgen]
     pub fn get_boids(&self) -> js_sys::Float32Array {
-        // Pre-allocate with exact capacity
-        let capacity = self.boids.len() * 7;
+        // Pre-allocate with exact capacity (8 values per boid: x, y, size, angle, r, g, b, a)
+        let capacity = self.boids.len() * 8;
         let mut data = Vec::with_capacity(capacity);
         
         // Process boids in chunks for better cache utilization
@@ -159,11 +169,13 @@ impl Flock {
             for boid in chunk {
                 let species = &self.species[&boid.species_id];
                 let color = species.color;
+                let angle = boid.velocity.y.atan2(boid.velocity.x);
                 
                 data.extend_from_slice(&[
                     boid.position.x,
                     boid.position.y,
                     species.size,
+                    angle,
                     ((color >> 24) & 0xFF) as f32 / 255.0,
                     ((color >> 16) & 0xFF) as f32 / 255.0,
                     ((color >> 8) & 0xFF) as f32 / 255.0,
@@ -183,8 +195,18 @@ impl Flock {
     pub fn set_size(&mut self, target_size: usize) {
         let current_size = self.boids.len();
         if target_size > current_size {
-            // Add more boids
-            self.add_boids(target_size - current_size, 0);
+            // Add more boids with default species
+            let default_species = Species::new(
+                50.0, 50.0, 25.0,   // radii
+                1.0, 1.0, 1.0,      // forces
+                4.0, 0.1,           // speed/force
+                5.0,                // size
+                0xFF0000FF,         // color (red)
+                1.0,                // spawn multiplier
+                0.5, 0.5, 1.5       // other species interaction multipliers
+            );
+            let species_id = self.add_species(default_species);
+            self.add_boids(target_size - current_size, species_id);
         } else if target_size < current_size {
             // Remove excess boids
             self.boids.truncate(target_size);
@@ -214,17 +236,20 @@ mod tests {
     #[test]
     fn test_species_creation() {
         let species = Species::new(
-            40.0, // alignment_radius
-            45.0, // cohesion_radius
-            20.0, // separation_radius
-            1.2,  // alignment_force
-            0.8,  // cohesion_force
-            1.5,  // separation_force
-            3.0,  // max_speed
-            0.2,  // max_force
-            6.0,  // size
-            0xFF0000FF, // color (red)
-            1.2,  // spawn_rate_multiplier
+            40.0,  // alignment_radius
+            45.0,  // cohesion_radius
+            20.0,  // separation_radius
+            1.2,   // alignment_force
+            0.8,   // cohesion_force
+            1.5,   // separation_force
+            3.0,   // max_speed
+            0.2,   // max_force
+            6.0,   // size
+            0xFF0000FF,  // color (red)
+            1.2,   // spawn_rate_multiplier
+            0.5,   // other_species_alignment_multiplier
+            0.5,   // other_species_cohesion_multiplier
+            1.5,   // other_species_separation_multiplier
         );
         
         assert_eq!(species.alignment_radius, 40.0);
@@ -244,12 +269,13 @@ mod tests {
     fn test_multiple_species() {
         let mut flock = Flock::new(800.0, 600.0, 10);
         let fast_species = Species::new(
-            50.0, 50.0, 25.0,  // radii
-            1.0, 1.0, 1.0,     // forces
-            6.0, 0.2,          // speed/force
-            8.0,               // size
-            0x00FF00FF,        // color (green)
-            1.5,               // spawn multiplier
+            50.0, 50.0, 25.0,   // radii
+            1.0, 1.0, 1.0,      // forces
+            6.0, 0.2,           // speed/force
+            8.0,                // size
+            0x00FF00FF,         // color (green)
+            1.5,                // spawn multiplier
+            0.5, 0.5, 1.5,      // other species interaction multipliers
         );
         let species_id = flock.add_species(fast_species);
         flock.add_boids(5, species_id);
@@ -263,12 +289,13 @@ mod tests {
         let mut flock = Flock::new(800.0, 600.0, 10);
         let species_id = flock.add_species(Species::default());
         let updated_species = Species::new(
-            60.0, 60.0, 30.0,  // radii
-            1.2, 0.8, 1.5,     // forces
-            5.0, 0.3,          // speed/force
-            7.0,               // size
-            0x0000FFFF,        // color (blue)
-            1.0,               // spawn multiplier
+            60.0, 60.0, 30.0,   // radii
+            1.2, 0.8, 1.5,      // forces
+            5.0, 0.3,           // speed/force
+            7.0,                // size
+            0x0000FFFF,         // color (blue)
+            1.0,                // spawn multiplier
+            0.5, 0.5, 1.5,      // other species interaction multipliers
         );
         assert!(flock.update_species(species_id, updated_species));
     }
