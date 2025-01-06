@@ -8,7 +8,7 @@ cargo install cargo-audit
 
 [tasks.setup]
 description = "Initial project setup"
-deps = ["install-deps"]
+depends = ["install-deps"]
 run = "cargo fetch"
 
 [tasks.build]
@@ -17,11 +17,15 @@ run = "cargo build --release"
 
 [tasks.build-web]
 description = "Build WebAssembly package"
-run = "wasm-pack build --target web"
+run = """
+rm -rf ./pkg ./examples/web/pkg
+wasm-pack build --target web
+cp -R ./pkg ./examples/web
+"""
 
 [tasks.build-linux]
 description = "Build for Linux"
-run = "cargo build --release --target x86_64-unknown-linux-gnu"
+run = "cargo build --release --target x86_64-unknown-linux-gnu "
 
 [tasks.build-windows]
 description = "Build for Windows"
@@ -41,6 +45,7 @@ run = "cargo watch -x test"
 
 [tasks.serve]
 description = "Serve web example"
+depends = ["build-web"]
 run = """
 cd examples/web
 python3 -m http.server 8080
@@ -89,7 +94,7 @@ cargo outdated
 
 [tasks.release]
 description = "Prepare for release"
-deps = ["check", "test", "build", "build-web"]
+depends = ["check", "test", "build", "build-web"]
 run = """
 echo "Ready for release!"
 echo "Don't forget to:"
@@ -100,7 +105,7 @@ echo "3. Create git tag"
 
 [tasks.ci]
 description = "Run CI checks"
-deps = ["check", "test"]
+depends = ["check", "test"]
 run = """
 mise run build
 mise run build-web
