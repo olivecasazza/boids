@@ -16,12 +16,12 @@ description = "Build for native platform"
 run = "cargo build --release"
 
 
-[tasks.build-web]
+[tasks.build-web-gl]
 description = "Build WebAssembly (vertex buffer based) package"
 run = """
-rm -rf ./pkg ./examples/web/pkg
+rm -rf ./pkg ./examples/web-gl/pkg
 wasm-pack build --target web
-cp -R ./pkg ./examples/web/
+cp -R ./pkg ./examples/web-gl/
 """
 
 [tasks.build-web-canvas]
@@ -57,6 +57,14 @@ description = "Serve web example"
 depends = ["build-web-canvas"]
 run = """
 cd examples/web-canvas
+python3 -m http.server 8080
+"""
+
+[tasks.serve-web-gl]
+description = "Serve web example"
+depends = ["build-web-gl"]
+run = """
+cd examples/web-gl
 python3 -m http.server 8080
 """
 

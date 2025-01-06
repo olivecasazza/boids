@@ -71,13 +71,25 @@ impl Boid {
             let cohesion = ((center_of_mass - self.position).normalize_or_zero() * species.max_speed - self.velocity)
                 .clamp_length_max(species.max_force) * species.cohesion_force;
 
-            // Separation - same species
+            // Separation - same species with stronger minimum distance enforcement
             let mut separation = Vec2::ZERO;
+            let min_distance = species.size * 3.0; // Increased minimum distance
+            let min_distance_sq = min_distance * min_distance;
+            
             for &(pos, _) in &same_species {
                 let offset = self.position - pos;
                 let dist_sq = offset.length_squared();
                 if dist_sq > 0.0 {
-                    separation += offset / dist_sq;
+                    let force = if dist_sq < min_distance_sq {
+                        // Much stronger repulsion when closer than minimum distance
+                        // Use cubic inverse distance (1/r³) for very strong close-range repulsion
+                        // Plus additional multiplier of 5.0 for extra strength
+                        offset.normalize_or_zero() * (min_distance_sq * min_distance_sq / (dist_sq * dist_sq.sqrt())) * 5.0
+                    } else {
+                        // Normal inverse square law for further distances
+                        offset / dist_sq
+                    };
+                    separation += force;
                 }
             }
             
@@ -109,13 +121,25 @@ impl Boid {
             let cohesion = ((center_of_mass - self.position).normalize_or_zero() * species.max_speed - self.velocity)
                 .clamp_length_max(species.max_force) * species.cohesion_force * species.other_species_cohesion_multiplier;
 
-            // Separation - other species
+            // Separation - other species with stronger minimum distance enforcement
             let mut separation = Vec2::ZERO;
+            let min_distance = species.size * 3.0; // Increased minimum distance
+            let min_distance_sq = min_distance * min_distance;
+            
             for &(pos, _) in &other_species {
                 let offset = self.position - pos;
                 let dist_sq = offset.length_squared();
                 if dist_sq > 0.0 {
-                    separation += offset / dist_sq;
+                    let force = if dist_sq < min_distance_sq {
+                        // Much stronger repulsion when closer than minimum distance
+                        // Use cubic inverse distance (1/r³) for very strong close-range repulsion
+                        // Plus additional multiplier of 5.0 for extra strength
+                        offset.normalize_or_zero() * (min_distance_sq * min_distance_sq / (dist_sq * dist_sq.sqrt())) * 50.0
+                    } else {
+                        // Normal inverse square law for further distances
+                        offset / dist_sq
+                    };
+                    separation += force;
                 }
             }
             

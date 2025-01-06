@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>WASM Flock WebGL Demo</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            padding: 20px;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        canvas {
+            border: 1px solid black;
+            background: #f0f0f0;
+        }
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #flock-size {
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas" width="800" height="600"></canvas>
+    <div class="controls">
+        <label for="flock-size">Flock Size:</label>
+        <input type="range" id="flock-size" min="1" max="3000" value="50">
+        <span id="size-display">50 / 3000</span>
+    </div>
+    <script type="module">
+        // Initialize workers
+        const flockWorker = new Worker('./flock-worker.js', { type: 'module' });
+        const renderWorker = new Worker('./render-worker.js', { type: 'module' });
+
+        // Performance monitoring
+        let lastTime = performance.now();
+        let frames = 0;
+        let fpsDisplay = document.createElement('div');
+        document.body.appendChild(fpsDisplay);
+
+        // Timing breakdown
+        let updateTime = 0;
+        let drawTime = 0;
+        let timingDisplay = document.createElement('div');
+        document.body.appendChild(timingDisplay);
+
+        // Track species IDs
+        let speciesIds = [0]; // Default species
+
+        async function run() {
+            const canvas = document.getElementById('canvas');
+            
+            // Transfer canvas control to render worker
+            const offscreen = canvas.transferControlToOffscreen();
+            renderWorker.postMessage({ 
+                type: 'init',
+                canvas: offscreen 
+            }, [offscreen]);
+
+            // Initialize flock worker
+            flockWorker.postMessage({ 
+                type: 'init',
+                data: {
+                    width: canvas.width,
+                    height: canvas.height
+                }
+            });
+
+            // Track mouse state and handle boid creation
+            let isMouseDown = false;
+            let lastBoidTime = 0;
+            const DEBOUNCE_TIME = 100; // ms between boid creation
+
+            canvas.addEventListener('mousedown', () => {
+                isMouseDown = true;
+            });
+
+            canvas.addEventListener('mouseup', () => {
+                isMouseDown = false;
+            });
+
+            canvas.addEventListener('mouseleave', () => {
+                isMouseDown = false;
+            });
+
+            canvas.addEventListener('mousemove', (event) => {
+                if (!isMouseDown) return;
+                
+                const now = performance.now();
+                if (now - lastBoidTime < DEBOUNCE_TIME) return;
+                
+                const rect = canvas.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+
+                // Add a new boid at the clicked position with a random species
+                const randomSpeciesId = speciesIds[Math.floor(Math.random() * speciesIds.length)];
+                flockWorker.postMessage({
+                    type: 'addBoidAt',
+                    data: { x, y, speciesId: randomSpeciesId }
+                });
+                
+                lastBoidTime = now;
+            });
+
+            // Setup slider control
+            const sizeSlider = document.getElementById('flock-size');
+            const sizeDisplay = document.getElementById('size-display');
+            
+            sizeSlider.addEventListener('input', () => {
+                const targetSizePerSpecies = Math.floor(parseInt(sizeSlider.value) / 3);
+                flockWorker.postMessage({
+                    type: 'setSize',
+                    data: { size: targetSizePerSpecies * 3 } // Maintain equal distribution
+                });
+            });
+
+            // Handle worker messages
+            flockWorker.onmessage = (e) => {
+                const { type, data } = e.data;
+                
+                switch (type) {
+                    case 'initialized':
+                        // Store species IDs for later use
+                        speciesIds = [0, data.species1Id, data.species2Id];
+                        break;
+                        
+                    case 'positions':
+                        updateTime = data.updateTime;
+                        // Forward positions to render worker
+                        renderWorker.postMessage({
+                            type: 'render',
+                            data: { positions: data.positions }
+                        });
+                        break;
+
+                    case 'flockSize':
+                        sizeDisplay.textContent = `${data} / 3000`;
+                        break;
+                }
+            };
+
+            renderWorker.onmessage = (e) => {
+                const { type, data } = e.data;
+                
+                if (type === 'drawTime') {
+                    drawTime = data;
+                }
+            };
+
+            function animate() {
+                const now = performance.now();
+                frames++;
+                
+                if (now - lastTime > 1000) {
+                    fpsDisplay.textContent = `FPS: ${frames}`;
+                    timingDisplay.textContent = `Update: ${updateTime.toFixed(2)}ms | Draw: ${drawTime.toFixed(2)}ms`;
+                    frames = 0;
+                    lastTime = now;
+                }
+
+                // Request next flock update
+                flockWorker.postMessage({ type: 'update' });
+                requestAnimationFrame(animate);
+            }
+
+            animate();
+        }
+
+        run().catch(console.error);
+    </script>
+</body>
+</html>
